@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI PR Review 助手 v2</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0b0f;--bg2:#12141a;--bg3:#1a1d26;--bg4:#222535;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --text:#e8eaf0;--text2:#9098b0;--text3:#5c6478;
+  --accent:#4f8ef7;--accent2:#7c5cfc;
+  --green:#29d97a;--red:#f05c5c;--amber:#f0a940;--teal:#2dcfc4;
+  --mono:'JetBrains Mono',monospace;--head:'Syne',sans-serif;
+  --r:10px;--rl:14px;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.6;min-height:100vh;display:flex;flex-direction:column}
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--head);font-weight:800;font-size:17px;color:var(--text)}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px}
+.badge{background:rgba(79,142,247,0.15);color:var(--accent);font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid rgba(79,142,247,0.25);font-family:var(--head);font-weight:600}
+.header-sub{font-size:11px;color:var(--text3)}
+.main{display:flex;flex:1;overflow:hidden;height:calc(100vh - 53px)}
+.sidebar{width:310px;min-width:270px;border-right:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;overflow-y:auto}
+.content{flex:1;overflow-y:auto;background:var(--bg);display:flex;flex-direction:column}
+.s-section{padding:16px 18px 12px}
+.s-label{font-size:10px;font-weight:600;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:10px;font-family:var(--head)}
+.input-group{display:flex;flex-direction:column;gap:8px}
+input[type=text],input[type=password],select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+input::placeholder,textarea::placeholder{color:var(--text3)}
+select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235c6478' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+select option{background:var(--bg3)}
+.api-row{display:flex;gap:6px}
+.api-row select{width:auto;flex:0 0 110px;font-size:11px}
+.api-row input{flex:1}
+.btn{width:100%;padding:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--r);color:#fff;font-family:var(--head);font-weight:700;font-size:13px;cursor:pointer;transition:opacity .2s,transform .1s;display:flex;align-items:center;justify-content:center;gap:7px}
+.btn:hover{opacity:.88}.btn:active{transform:scale(.98)}.btn:disabled{opacity:.35;cursor:not-allowed}
+.api-hint{font-size:10px;color:var(--text3);padding:8px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);line-height:1.6}
+.api-hint a{color:var(--accent);text-decoration:none}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{padding:4px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s}
+.chip:hover{border-color:var(--accent);color:var(--accent);background:rgba(79,142,247,.06)}
+.pr-meta{padding:12px 18px;border-bottom:1px solid var(--border);display:none}
+.pr-title{font-family:var(--head);font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.4}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;font-family:var(--head)}
+.tag-green{background:rgba(41,217,122,.12);color:var(--green);border:1px solid rgba(41,217,122,.2)}
+.tag-amber{background:rgba(240,169,64,.12);color:var(--amber);border:1px solid rgba(240,169,64,.2)}
+.tag-red{background:rgba(240,92,92,.12);color:var(--red);border:1px solid rgba(240,92,92,.2)}
+.tag-blue{background:rgba(79,142,247,.12);color:var(--accent);border:1px solid rgba(79,142,247,.2)}
+.tag-gray{background:rgba(255,255,255,.05);color:var(--text2);border:1px solid var(--border)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:7px 5px;text-align:center}
+.stat-num{font-size:15px;font-weight:600;font-family:var(--head)}
+.stat-lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-top:1px}
+.nav{padding:12px 18px 8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r);cursor:pointer;transition:background .15s;margin-bottom:2px;font-size:12px;color:var(--text2);border:1px solid transparent}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:rgba(79,142,247,.1);color:var(--accent);border-color:rgba(79,142,247,.2)}
+.nav-cnt{margin-left:auto;font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg4);color:var(--text3);font-family:var(--head);font-weight:600}
+.nav-item.active .nav-cnt{background:rgba(79,142,247,.2);color:var(--accent)}
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:40px 32px;text-align:center;gap:14px}
+.welcome-icon{width:68px;height:68px;background:rgba(79,142,247,.08);border-radius:18px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(79,142,247,.18);font-size:30px}
+.welcome h2{font-family:var(--head);font-size:21px;font-weight:800;color:var(--text);line-height:1.3}
+.welcome p{color:var(--text2);font-size:13px;max-width:360px;line-height:1.7}
+.feat-list{display:flex;flex-direction:column;gap:7px;text-align:left;width:100%;max-width:330px}
+.feat{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--text2)}
+.loading{display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:14px;padding:40px}
+.spinner{width:38px;height:38px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.steps{display:flex;flex-direction:column;gap:7px;width:100%;max-width:300px}
+.step{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--text3);padding:7px 11px;border-radius:8px;transition:all .3s}
+.step.done{color:var(--green);background:rgba(41,217,122,.05)}
+.step.active{color:var(--accent);background:rgba(79,142,247,.06)}
+.err-state{display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:14px;padding:40px;text-align:center}
+.err-icon{width:64px;height:64px;background:rgba(240,92,92,.08);border-radius:18px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(240,92,92,.2);font-size:28px;color:var(--red)}
+.err-title{font-family:var(--head);font-size:18px;font-weight:700;color:var(--red)}
+.err-msg{color:var(--text2);font-size:13px;max-width:360px;line-height:1.6;word-break:break-all}
+.btn-retry{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 24px;color:var(--text2);font-family:var(--head);font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:7px;margin-top:4px}
+.btn-retry:hover{border-color:var(--accent);color:var(--accent)}
+.panel{padding:22px;display:none}
+.panel.active{display:block}
+.panel-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.panel-title{font-family:var(--head);font-size:17px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:9px}
+.copy-btn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text3);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:var(--mono);transition:all .2s}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+.verdict{display:flex;align-items:center;gap:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:18px;margin-bottom:16px}
+.v-icon{width:50px;height:50px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.v-lbl{font-size:10px;color:var(--text3);margin-bottom:3px;font-family:var(--head);font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+.v-text{font-family:var(--head);font-size:18px;font-weight:800;line-height:1.2}
+.v-sub{font-size:12px;color:var(--text2);margin-top:3px}
+.v-score{text-align:center;font-family:var(--head);margin-left:auto;flex-shrink:0}
+.v-score .snum{font-size:34px;font-weight:800;line-height:1}
+.v-score .slbl{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px}
+.m-lbl{font-size:10px;color:var(--text3);font-family:var(--head);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.m-val{font-family:var(--head);font-size:26px;font-weight:800;line-height:1}
+.m-desc{font-size:10px;color:var(--text3);margin-top:3px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;margin-bottom:12px}
+.card h3{font-family:var(--head);font-size:13px;font-weight:700;color:var(--text);margin-bottom:9px}
+.card-text{color:var(--text2);font-size:12px;line-height:1.7}
+.card-text p{margin-bottom:6px}.card-text p:last-child{margin-bottom:0}
+.p-wrap{margin:4px 0 10px}
+.p-lbl{font-size:11px;color:var(--text3);margin-bottom:3px;display:flex;justify-content:space-between}
+.p-bar{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.p-fill{height:100%;border-radius:2px}
+.file-list{display:flex;flex-direction:column;gap:5px}
+.file-item{display:flex;align-items:center;gap:9px;padding:7px 11px;background:var(--bg3);border-radius:8px;font-size:11px;border:1px solid var(--border)}
+.file-name{flex:1;color:var(--text);font-weight:500;word-break:break-all}
+.risk-list{display:flex;flex-direction:column;gap:9px}
+.risk{background:var(--bg2);border-radius:var(--rl);border:1px solid var(--border);overflow:hidden}
+.risk-hdr{display:flex;align-items:flex-start;gap:11px;padding:13px 14px;cursor:pointer;user-select:none}
+.risk-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.risk-dot.high{background:var(--red);box-shadow:0 0 5px rgba(240,92,92,.4)}
+.risk-dot.medium{background:var(--amber);box-shadow:0 0 5px rgba(240,169,64,.4)}
+.risk-dot.low{background:var(--green);box-shadow:0 0 5px rgba(41,217,122,.4)}
+.risk-info{flex:1}
+.risk-title{font-family:var(--head);font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
+.risk-file{font-size:11px;color:var(--text3)}
+.risk-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;font-family:var(--head);text-transform:uppercase;letter-spacing:.4px;flex-shrink:0}
+.risk-badge.high{background:rgba(240,92,92,.12);color:var(--red);border:1px solid rgba(240,92,92,.2)}
+.risk-badge.medium{background:rgba(240,169,64,.12);color:var(--amber);border:1px solid rgba(240,169,64,.2)}
+.risk-badge.low{background:rgba(41,217,122,.12);color:var(--green);border:1px solid rgba(41,217,122,.2)}
+.risk-body{padding:0 14px 13px;display:none}
+.risk-body.open{display:block}
+.risk-desc{color:var(--text2);font-size:12px;line-height:1.7;margin-bottom:9px}
+.code-block{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-family:var(--mono);font-size:11px;color:var(--text2);overflow-x:auto;margin-bottom:9px;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.fix{background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.15);border-radius:8px;padding:9px 11px;font-size:12px;color:var(--text2);display:flex;gap:7px}
+.sugg-list{display:flex;flex-direction:column;gap:9px}
+.sugg{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:13px 14px}
+.sugg-hdr{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.sugg-title{font-family:var(--head);font-size:13px;font-weight:700;color:var(--text);flex:1}
+.sugg-body{color:var(--text2);font-size:12px;line-height:1.7}
+.sugg-code{margin-top:9px;background:var(--bg3);border-radius:8px;padding:9px 11px;font-family:var(--mono);font-size:11px}
+.sugg-code .before{color:var(--red);margin-bottom:3px}
+.sugg-code .after{color:var(--green)}
+.diff-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:14px}
+.diff-hdr{display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:12px;color:var(--text)}
+.diff-body{overflow-x:auto}
+.dl{display:flex;align-items:flex-start;padding:1px 12px;gap:10px;font-size:11px;font-family:var(--mono);line-height:1.7}
+.dl.add{background:rgba(41,217,122,.06)}.dl.del{background:rgba(240,92,92,.06)}.dl.hunk{background:rgba(79,142,247,.05)}
+.dl-num{color:var(--text3);min-width:28px;text-align:right;font-size:10px;margin-top:2px;user-select:none}
+.dl-sign{min-width:10px;font-weight:600}
+.dl.add .dl-sign{color:var(--green)}.dl.del .dl-sign{color:var(--red)}
+.dl-code{flex:1;white-space:pre-wrap;word-break:break-all;color:var(--text2)}
+.dl.add .dl-code{color:var(--green)}.dl.del .dl-code{color:var(--red);opacity:.7}.dl.hunk .dl-code{color:var(--text3);font-size:10px}
+.design-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:15px;margin-bottom:11px}
+.design-card h3{font-family:var(--head);font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px}
+.design-card p{font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:5px}
+.design-card ul{padding-left:15px;color:var(--text2);font-size:12px;line-height:1.85}
+.design-card li{margin-bottom:2px}
+.design-card code{background:var(--bg3);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px;color:var(--teal)}
+.empty{text-align:center;padding:36px 20px;color:var(--text3)}
+.empty-icon{font-size:30px;margin-bottom:7px;display:block}
+.empty p{font-size:12px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp .3s ease forwards}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    AI PR Review 助手
+    <span class="badge">v2.0</span>
+  </div>
+  <div class="header-sub" id="headerSub">支持 DeepSeek / OpenAI / Moonshot / 智谱 / 通义</div>
+</header>
+
+<div class="main">
+  <aside class="sidebar">
+    <div class="s-section">
+      <div class="s-label">AI 模型配置</div>
+      <div class="input-group">
+        <div class="api-row">
+          <select id="apiProvider" onchange="onProviderChange()">
+            <option value="deepseek">DeepSeek</option>
+            <option value="openai">OpenAI</option>
+            <option value="moonshot">Moonshot</option>
+            <option value="zhipu">智谱 GLM</option>
+            <option value="qwen">通义千问</option>
+            <option value="custom">自定义</option>
+          </select>
+          <input type="password" id="apiKey" placeholder="API Key">
+        </div>
+        <div id="customUrlRow" style="display:none">
+          <input type="text" id="customUrl" placeholder="API Base URL（如 http://localhost:11434/v1）">
+        </div>
+        <div id="customModelRow" style="display:none">
+          <input type="text" id="customModel" placeholder="模型名称（如 llama3）">
+        </div>
+        <div class="api-hint" id="apiHint">
+          DeepSeek：<a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 免费额度充足
+        </div>
+      </div>
+    </div>
+
+    <div class="s-section" style="padding-top:0">
+      <div class="s-label">PR 配置</div>
+      <div class="input-group">
+        <input type="text" id="prUrl" placeholder="GitHub PR 链接">
+        <input type="password" id="ghToken" placeholder="GitHub Token（可选，提升限额）">
+        <select id="mode">
+          <option value="full">🔍 全量分析（推荐）</option>
+          <option value="security">🔒 安全优先</option>
+          <option value="perf">⚡ 性能优先</option>
+          <option value="quick">💨 快速摘要</option>
+        </select>
+        <button class="btn" id="analyzeBtn" onclick="startAnalysis()">✨ 开始 AI 分析</button>
+      </div>
+      <div class="chips">
+        <div class="chip" onclick="setEx('https://github.com/axios/axios/pull/10959')">axios #10959</div>
+        <div class="chip" onclick="setEx('https://github.com/axios/axios/pull/10949')">axios #10949</div>
+        <div class="chip" onclick="setEx('https://github.com/axios/axios/pull/10946')">axios #10946</div>
+      </div>
+    </div>
+
+    <div class="pr-meta" id="prMeta">
+      <div class="pr-title" id="prTitle"></div>
+      <div class="tags" id="prTags"></div>
+      <div class="stats" id="prStats"></div>
+    </div>
+
+    <div class="nav" id="navArea" style="display:none">
+      <div class="s-label" style="margin-bottom:8px">分析报告</div>
+      <div class="nav-item active" onclick="showPanel('summary',this)">📊 变更摘要 <span class="nav-cnt" id="nc-summary">—</span></div>
+      <div class="nav-item" onclick="showPanel('risks',this)">⚠️ 风险识别 <span class="nav-cnt" id="nc-risks">—</span></div>
+      <div class="nav-item" onclick="showPanel('suggestions',this)">💡 优化建议 <span class="nav-cnt" id="nc-suggestions">—</span></div>
+      <div class="nav-item" onclick="showPanel('diff',this)">📝 差异视图 <span class="nav-cnt" id="nc-diff">—</span></div>
+      <div class="nav-item" onclick="showPanel('design',this)">📐 系统设计 <span class="nav-cnt"></span></div>
+    </div>
+  </aside>
+
+  <main class="content" id="contentArea">
+    <div class="welcome" id="welcomeState">
+      <div class="welcome-icon">🔍</div>
+      <h2>AI 驱动的代码评审助手</h2>
+      <p>选择 AI 提供商，填入 API Key 和 GitHub PR 链接，即可自动分析代码变更。</p>
+      <div class="feat-list">
+        <div class="feat">🤖 支持 DeepSeek / OpenAI / Moonshot / 智谱 / 通义 / 自定义</div>
+        <div class="feat">✨ PR 变更语义摘要，快速理解改动意图</div>
+        <div class="feat">⚠️ 安全 / 性能 / 逻辑风险自动识别</div>
+        <div class="feat">💡 具体可操作的代码改进建议</div>
+        <div class="feat">📝 带 AI 注释的真实 diff 视图</div>
+      </div>
+    </div>
+
+    <div class="loading" id="loadingState">
+      <div class="spinner"></div>
+      <div style="font-family:var(--head);font-size:15px;font-weight:700;color:var(--text)">正在分析 PR...</div>
+      <div class="steps">
+        <div class="step" id="st1">⭕ 获取 PR 基本信息</div>
+        <div class="step" id="st2">⭕ 下载文件差异数据</div>
+        <div class="step" id="st3">⭕ AI 语义理解与摘要</div>
+        <div class="step" id="st4">⭕ 多维度风险扫描</div>
+        <div class="step" id="st5">⭕ 生成优化建议</div>
+        <div class="step" id="st6">⭕ 综合评分与报告</div>
+      </div>
+    </div>
+
+    <div class="err-state" id="errState">
+      <div class="err-icon">❌</div>
+      <div class="err-title">分析失败</div>
+      <div class="err-msg" id="errMsg"></div>
+      <button class="btn-retry" onclick="resetUI()">🔄 重新输入</button>
+    </div>
+
+    <div id="panels" style="display:none;flex:1;flex-direction:column">
+      <div class="panel active" id="panel-summary">
+        <div class="panel-hdr">
+          <div class="panel-title">📊 变更摘要</div>
+          <button class="copy-btn" onclick="exportReport()">📋 导出 JSON</button>
+        </div>
+        <div id="summaryContent"></div>
+      </div>
+      <div class="panel" id="panel-risks">
+        <div class="panel-hdr"><div class="panel-title">⚠️ 风险代码识别</div></div>
+        <div id="risksContent"></div>
+      </div>
+      <div class="panel" id="panel-suggestions">
+        <div class="panel-hdr"><div class="panel-title">💡 Review 建议</div></div>
+        <div id="suggestionsContent"></div>
+      </div>
+      <div class="panel" id="panel-diff">
+        <div class="panel-hdr"><div class="panel-title">📝 差异视图</div></div>
+        <div id="diffContent"></div>
+      </div>
+      <div class="panel" id="panel-design">
+        <div class="panel-hdr"><div class="panel-title">📐 系统设计说明</div></div>
+        <div id="designContent"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+let lastResult = null;
+
+const PROVIDERS = {
+  deepseek: {
+    url: 'https://api.deepseek.com/chat/completions',
+    model: 'deepseek-chat',
+    hint: 'DeepSeek：<a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 注册送免费额度，推荐首选',
+  },
+  openai: {
+    url: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-4o-mini',
+    hint: 'OpenAI：<a href="https://platform.openai.com" target="_blank">platform.openai.com</a> 使用 gpt-4o-mini 更经济',
+  },
+  moonshot: {
+    url: 'https://api.moonshot.cn/v1/chat/completions',
+    model: 'moonshot-v1-8k',
+    hint: 'Moonshot 月之暗面：<a href="https://platform.moonshot.cn" target="_blank">platform.moonshot.cn</a>',
+  },
+  zhipu: {
+    url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    model: 'glm-4-flash',
+    hint: '智谱 AI：<a href="https://open.bigmodel.cn" target="_blank">open.bigmodel.cn</a> GLM-4-Flash 免费使用',
+  },
+  qwen: {
+    url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+    model: 'qwen-turbo',
+    hint: '通义千问：<a href="https://dashscope.console.aliyun.com" target="_blank">dashscope.console.aliyun.com</a>',
+  },
+  custom: {
+    url: '',
+    model: '',
+    hint: '自定义：填入兼容 OpenAI 格式的 API 地址和模型名，支持本地 Ollama 等',
+  }
+};
+
+function onProviderChange() {
+  const p = document.getElementById('apiProvider').value;
+  const cfg = PROVIDERS[p];
+  document.getElementById('apiHint').innerHTML = cfg.hint;
+  document.getElementById('customUrlRow').style.display = p === 'custom' ? 'block' : 'none';
+  document.getElementById('customModelRow').style.display = p === 'custom' ? 'block' : 'none';
+  document.getElementById('headerSub').textContent = '当前：' + p.toUpperCase() + ' · 智能代码审查';
+}
+
+function setEx(url) { document.getElementById('prUrl').value = url; }
+
+function showPanel(name, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+function resetUI() {
+  document.getElementById('errState').style.display = 'none';
+  document.getElementById('welcomeState').style.display = 'flex';
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+function parsePR(url) {
+  const m = url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+  return m ? { owner: m[1], repo: m[2], num: parseInt(m[3]) } : null;
+}
+
+async function ghFetch(path, token, accept) {
+  const h = { 'Accept': accept || 'application/vnd.github.v3+json' };
+  if (token) h['Authorization'] = 'token ' + token;
+  const r = await fetch('https://api.github.com' + path, { headers: h });
+  if (r.status === 403) {
+    const d = await r.json().catch(() => ({}));
+    if ((d.message || '').includes('rate limit')) throw new Error('GitHub API 速率限制，请填入 GitHub Token 后重试');
+    throw new Error('GitHub 访问被拒绝，请填入有效的 GitHub Token');
+  }
+  if (r.status === 404) throw new Error('PR 不存在，请检查链接是否正确');
+  if (!r.ok) throw new Error('GitHub API 错误: ' + r.status);
+  return r;
+}
+
+async function setStep(id, state, text) {
+  const el = document.getElementById(id);
+  if (state === 'active') { el.className = 'step active'; el.textContent = '🔄 ' + text; }
+  else if (state === 'done') { el.className = 'step done'; el.textContent = '✅ ' + text; }
+  await new Promise(r => setTimeout(r, 180));
+}
+
+async function startAnalysis() {
+  const provider = document.getElementById('apiProvider').value;
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const prUrl = document.getElementById('prUrl').value.trim();
+  const ghToken = document.getElementById('ghToken').value.trim();
+  const mode = document.getElementById('mode').value;
+  const customUrl = document.getElementById('customUrl').value.trim();
+  const customModel = document.getElementById('customModel').value.trim();
+
+  if (!apiKey) { alert('请填入 API Key'); return; }
+  if (!prUrl) { alert('请填入 GitHub PR 链接'); return; }
+
+  const prInfo = parsePR(prUrl);
+  if (!prInfo) { alert('PR 链接格式不对，需要是：https://github.com/owner/repo/pull/123'); return; }
+
+  if (provider === 'custom' && !customUrl) { alert('请填入自定义 API 地址'); return; }
+
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('welcomeState').style.display = 'none';
+  document.getElementById('errState').style.display = 'none';
+  document.getElementById('panels').style.display = 'none';
+  document.getElementById('navArea').style.display = 'none';
+  document.getElementById('prMeta').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'flex';
+
+  const stepTexts = ['PR 基本信息','文件差异数据','AI 语义理解','风险扫描','生成建议','综合评分'];
+  stepTexts.forEach((t, i) => {
+    const el = document.getElementById('st' + (i + 1));
+    el.className = 'step'; el.textContent = '⭕ ' + t;
+  });
+
+  try {
+    await setStep('st1', 'active', '获取 PR 基本信息');
+    const prResp = await ghFetch(`/repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.num}`, ghToken);
+    const prData = await prResp.json();
+    await setStep('st1', 'done', '获取 PR 基本信息');
+
+    await setStep('st2', 'active', '下载文件差异数据');
+    const diffResp = await ghFetch(`/repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.num}`, ghToken, 'application/vnd.github.v3+diff');
+    const diffText = await diffResp.text();
+    await setStep('st2', 'done', '下载文件差异数据');
+
+    await setStep('st3', 'active', 'AI 语义理解与摘要');
+    await setStep('st4', 'active', '多维度风险扫描');
+    await setStep('st5', 'active', '生成优化建议');
+
+    const cfg = PROVIDERS[provider];
+    const apiUrl = provider === 'custom' ? customUrl : cfg.url;
+    const modelName = provider === 'custom' ? customModel : cfg.model;
+
+    const result = await callAI(apiKey, apiUrl, modelName, prData, diffText, mode);
+    lastResult = result;
+
+    await setStep('st3', 'done', 'AI 语义理解与摘要');
+    await setStep('st4', 'done', '多维度风险扫描');
+    await setStep('st5', 'done', '生成优化建议');
+    await setStep('st6', 'active', '综合评分与报告');
+    await new Promise(r => setTimeout(r, 300));
+    await setStep('st6', 'done', '综合评分与报告');
+    await new Promise(r => setTimeout(r, 400));
+
+    renderAll(prData, diffText, result);
+  } catch (err) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errState').style.display = 'flex';
+    document.getElementById('errMsg').textContent = err.message || '未知错误，请重试';
+  }
+
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+async function callAI(apiKey, apiUrl, model, prData, diffText, mode) {
+  const modeDesc = {
+    full: '进行全面分析，包括变更摘要、风险识别、性能、安全、代码质量等各个维度。',
+    security: '重点关注安全漏洞、注入攻击、权限检查缺失、敏感数据暴露等安全风险。',
+    perf: '重点关注性能问题，包括 N+1 查询、内存泄漏、不必要重渲染、算法复杂度等。',
+    quick: '提供快速摘要，只列出最重要的变更和最高优先级的问题。'
+  }[mode];
+
+  const diff = diffText.substring(0, 12000);
+  const prompt = `你是资深代码审查专家。分析以下 GitHub Pull Request，只输出纯 JSON，禁止包含 markdown 代码块标记。
+
+PR 信息：
+标题: ${prData.title}
+描述: ${prData.body || '（无）'}
+作者: ${prData.user?.login}
+分支: ${prData.head?.label} → ${prData.base?.label}
+变更文件: ${prData.changed_files} 个，+${prData.additions} 行，-${prData.deletions} 行
+
+分析模式: ${modeDesc}
+
+代码差异（前12000字符）:
+${diff}
+
+输出 JSON（严格遵守此结构）:
+{"overallScore":75,"verdict":"建议修改后合并","verdictLevel":"warning","summary":{"overview":"总体描述","intent":"改动目的","impact":"影响范围","keyChanges":["变更1","变更2"]},"risks":[{"id":"R001","title":"风险标题","level":"high","category":"security","file":"文件路径","line":"行号","description":"详细描述","codeSnippet":"代码片段","suggestion":"修复建议"}],"suggestions":[{"category":"代码质量","title":"建议标题","description":"详细说明","before":"改进前","after":"改进后","priority":"high"}],"fileAnalysis":[{"file":"文件路径","type":"修改","riskLevel":"medium","comment":"说明"}],"dimensions":{"codeQuality":80,"security":70,"performance":75,"testCoverage":60,"documentation":65}}`;
+
+  const resp = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: 4000,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: '你是专业代码审查工程师，只输出纯JSON，不含任何markdown标记。' },
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+
+  if (resp.status === 401) throw new Error('API Key 无效，请检查后重试');
+  if (resp.status === 402) throw new Error('账户余额不足，请充值后重试');
+  if (resp.status === 429) throw new Error('请求过于频繁，请稍后重试');
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error('AI API 错误: ' + resp.status + (errText ? ' - ' + errText.substring(0, 100) : ''));
+  }
+
+  const data = await resp.json();
+  const text = data.choices?.[0]?.message?.content || '';
+  const clean = text.replace(/```json|```/g, '').trim();
+  const m = clean.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('AI 返回格式解析失败，请重试');
+  return JSON.parse(m[0]);
+}
+
+function renderAll(prData, diffText, result) {
+  document.getElementById('loadingState').style.display = 'none';
+
+  document.getElementById('prTitle').textContent = prData.title;
+  const tags = [];
+  if (prData.state === 'open') tags.push('<span class="tag tag-green">Open</span>');
+  else tags.push('<span class="tag tag-gray">Closed</span>');
+  if (prData.draft) tags.push('<span class="tag tag-gray">Draft</span>');
+  (prData.labels || []).forEach(l => tags.push(`<span class="tag tag-blue">${l.name}</span>`));
+  document.getElementById('prTags').innerHTML = tags.join('');
+  document.getElementById('prStats').innerHTML = `
+    <div class="stat"><div class="stat-num" style="color:var(--accent)">${prData.changed_files}</div><div class="stat-lbl">文件</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--green)">+${prData.additions}</div><div class="stat-lbl">新增</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--red)">-${prData.deletions}</div><div class="stat-lbl">删除</div></div>`;
+  document.getElementById('prMeta').style.display = 'block';
+
+  const risks = result.risks || [];
+  const highRisks = risks.filter(r => r.level === 'high').length;
+  document.getElementById('nc-risks').textContent = risks.length;
+  if (highRisks > 0) {
+    document.getElementById('nc-risks').style.background = 'rgba(240,92,92,.15)';
+    document.getElementById('nc-risks').style.color = 'var(--red)';
+  }
+  document.getElementById('nc-suggestions').textContent = (result.suggestions || []).length;
+  const diffFiles = (diffText.match(/^diff --git/gm) || []).length;
+  document.getElementById('nc-summary').textContent = (result.fileAnalysis || []).length + ' 文件';
+  document.getElementById('nc-diff').textContent = diffFiles + ' 文件';
+
+  renderSummary(result);
+  renderRisks(result);
+  renderSuggestions(result);
+  renderDiff(diffText, result);
+  renderDesign();
+
+  document.getElementById('navArea').style.display = 'block';
+  document.getElementById('panels').style.display = 'flex';
+}
+
+function renderSummary(r) {
+  const s = r.summary || {};
+  const dims = r.dimensions || {};
+  const score = r.overallScore || 75;
+  const vColors = { good: 'var(--green)', warning: 'var(--amber)', bad: 'var(--red)' };
+  const vLevel = r.verdictLevel || 'warning';
+  const vColor = vColors[vLevel] || 'var(--amber)';
+  const scoreColor = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--amber)' : 'var(--red)';
+  const dimLabels = { codeQuality: '代码质量', security: '安全', performance: '性能', testCoverage: '测试覆盖', documentation: '文档' };
+
+  document.getElementById('summaryContent').innerHTML = `
+    <div class="verdict fu">
+      <div class="v-icon" style="background:${vColor}22;border:1px solid ${vColor}33">${{ good: '✅', warning: '⚠️', bad: '❌' }[vLevel] || '⚠️'}</div>
+      <div style="flex:1">
+        <div class="v-lbl">综合评价</div>
+        <div class="v-text" style="color:${vColor}">${r.verdict || '建议检查后合并'}</div>
+        <div class="v-sub">${s.overview || ''}</div>
+      </div>
+      <div class="v-score">
+        <div class="snum" style="color:${scoreColor}">${score}</div>
+        <div class="slbl">综合评分</div>
+      </div>
+    </div>
+    <div class="metrics fu">
+      ${Object.entries(dims).slice(0, 4).map(([k, v]) => {
+        const c = v >= 80 ? 'var(--green)' : v >= 60 ? 'var(--amber)' : 'var(--red)';
+        return `<div class="metric"><div class="m-lbl">${dimLabels[k] || k}</div><div class="m-val" style="color:${c}">${v}</div><div class="m-desc">/100 分</div></div>`;
+      }).join('')}
+    </div>
+    <div class="card fu"><h3>🎯 改动意图</h3><div class="card-text"><p>${s.intent || '—'}</p></div></div>
+    <div class="card fu"><h3>📋 关键变更</h3><div class="card-text">${(s.keyChanges || []).map((c, i) => `<p>${i + 1}. ${c}</p>`).join('')}</div></div>
+    <div class="card fu"><h3>🌐 影响范围</h3><div class="card-text"><p>${s.impact || '—'}</p></div></div>
+    <div class="card fu">
+      <h3>📁 文件变更列表</h3>
+      <div class="file-list">${(r.fileAnalysis || []).map(f => `
+        <div class="file-item">
+          <span style="font-size:14px">${{ high: '🔴', medium: '🟡', low: '🔵', none: '⚪' }[f.riskLevel] || '⚪'}</span>
+          <span class="file-name">${f.file}</span>
+          <span class="tag ${f.riskLevel === 'high' ? 'tag-red' : f.riskLevel === 'medium' ? 'tag-amber' : 'tag-gray'}" style="font-size:9px">${f.type}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card fu">
+      <h3>📊 各维度评分</h3>
+      ${Object.entries(dims).map(([k, v]) => `
+        <div class="p-wrap">
+          <div class="p-lbl"><span>${dimLabels[k] || k}</span><span>${v}</span></div>
+          <div class="p-bar"><div class="p-fill" style="width:${v}%;background:${v >= 80 ? 'var(--green)' : v >= 60 ? 'var(--amber)' : 'var(--red)'}"></div></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderRisks(r) {
+  const risks = r.risks || [];
+  if (!risks.length) { document.getElementById('risksContent').innerHTML = '<div class="empty"><span class="empty-icon">✅</span><p>未发现明显风险</p></div>'; return; }
+  const catLabels = { security: '安全', performance: '性能', logic: '逻辑', maintainability: '可维护性' };
+  document.getElementById('risksContent').innerHTML = `<div class="risk-list">${risks.map((r, i) => `
+    <div class="risk fu">
+      <div class="risk-hdr" onclick="toggleRisk(${i})">
+        <div class="risk-dot ${r.level}"></div>
+        <div class="risk-info">
+          <div class="risk-title">${r.title}</div>
+          <div class="risk-file">${catLabels[r.category] || r.category} · ${r.file || '—'} ${r.line ? '行 ' + r.line : ''}</div>
+        </div>
+        <span class="risk-badge ${r.level}">${{ high: '高风险', medium: '中风险', low: '低风险' }[r.level] || r.level}</span>
+      </div>
+      <div class="risk-body" id="rb${i}">
+        <div class="risk-desc">${r.description}</div>
+        ${r.codeSnippet ? `<div class="code-block">${esc(r.codeSnippet)}</div>` : ''}
+        ${r.suggestion ? `<div class="fix">💡 <span>${r.suggestion}</span></div>` : ''}
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function toggleRisk(i) { document.getElementById('rb' + i).classList.toggle('open'); }
+
+function renderSuggestions(r) {
+  const suggs = r.suggestions || [];
+  if (!suggs.length) { document.getElementById('suggestionsContent').innerHTML = '<div class="empty"><span class="empty-icon">✅</span><p>暂无建议</p></div>'; return; }
+  const catEmoji = { '代码质量': '💻', '性能': '⚡', '安全': '🔒', '可维护性': '🔧', '测试': '🧪' };
+  document.getElementById('suggestionsContent').innerHTML = `<div class="sugg-list">${suggs.map(s => `
+    <div class="sugg fu">
+      <div class="sugg-hdr">
+        <span style="font-size:18px">${catEmoji[s.category] || '💡'}</span>
+        <div class="sugg-title">${s.title}</div>
+        <span class="tag ${s.priority === 'high' ? 'tag-red' : s.priority === 'medium' ? 'tag-amber' : 'tag-green'}" style="font-size:10px">${s.category}</span>
+      </div>
+      <div class="sugg-body">${s.description}</div>
+      ${(s.before || s.after) ? `<div class="sugg-code">${s.before ? `<div class="before">- ${esc(s.before)}</div>` : ''}${s.after ? `<div class="after">+ ${esc(s.after)}</div>` : ''}</div>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+function renderDiff(diffText, result) {
+  if (!diffText) { document.getElementById('diffContent').innerHTML = '<div class="empty"><span class="empty-icon">📝</span><p>未能获取差异内容</p></div>'; return; }
+  const riskMap = {};
+  (result.risks || []).forEach(r => { if (r.file) { if (!riskMap[r.file]) riskMap[r.file] = []; riskMap[r.file].push(r); } });
+  const parts = diffText.split(/^diff --git /m).filter(Boolean).slice(0, 8);
+  let html = '';
+  parts.forEach(part => {
+    const lines = part.split('\n');
+    const m = lines[0].match(/a\/(.*?) b\/(.*?)$/);
+    const file = m ? m[2] : lines[0].substring(0, 60);
+    const fr = riskMap[file] || [];
+    const badge = fr.length > 0 ? `<span class="tag tag-amber" style="font-size:10px;margin-left:auto">${fr.length}个风险</span>` : '';
+    html += `<div class="diff-wrap fu"><div class="diff-hdr">📄 ${file} ${badge}</div><div class="diff-body">${renderLines(lines.slice(1, 60))}</div></div>`;
+  });
+  document.getElementById('diffContent').innerHTML = html || '<div class="empty"><span class="empty-icon">📝</span><p>无差异内容</p></div>';
+}
+
+function renderLines(lines) {
+  let html = '', ln = 0;
+  lines.forEach(line => {
+    if (line.startsWith('@@')) {
+      const m = line.match(/@@ -\d+(?:,\d+)? \+(\d+)/);
+      if (m) ln = parseInt(m[1]) - 1;
+      html += `<div class="dl hunk"><span class="dl-num"></span><span class="dl-sign"> </span><span class="dl-code">${esc(line)}</span></div>`;
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+      ln++;
+      html += `<div class="dl add"><span class="dl-num">${ln}</span><span class="dl-sign">+</span><span class="dl-code">${esc(line.slice(1))}</span></div>`;
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      html += `<div class="dl del"><span class="dl-num"> </span><span class="dl-sign">-</span><span class="dl-code">${esc(line.slice(1))}</span></div>`;
+    } else if (!line.startsWith('---') && !line.startsWith('+++')) {
+      ln++;
+      html += `<div class="dl"><span class="dl-num">${ln}</span><span class="dl-sign"> </span><span class="dl-code">${esc(line.slice(1))}</span></div>`;
+    }
+  });
+  return html;
+}
+
+function renderDesign() {
+  document.getElementById('designContent').innerHTML = `
+    <div class="design-card fu">
+      <h3>🤖 支持的 AI 提供商</h3>
+      <ul>
+        <li><code>DeepSeek</code> — deepseek-chat，推荐首选，性价比最高，有免费额度</li>
+        <li><code>OpenAI</code> — gpt-4o-mini，效果优秀，需要海外账号</li>
+        <li><code>Moonshot</code> — moonshot-v1-8k，月之暗面，国内可用</li>
+        <li><code>智谱 GLM</code> — glm-4-flash，完全免费，国内可用</li>
+        <li><code>通义千问</code> — qwen-turbo，阿里云，国内可用</li>
+        <li><code>自定义</code> — 兼容 OpenAI 格式的任意端点，支持本地 Ollama</li>
+      </ul>
+    </div>
+    <div class="design-card fu">
+      <h3>🔗 上下文获取策略</h3>
+      <p>系统通过 GitHub API 获取两类核心数据：</p>
+      <ul>
+        <li>PR 元数据：标题、描述、作者、分支、标签等</li>
+        <li>Unified Diff：真实的文件变更差异（前 12000 字符）</li>
+        <li>智能截断：超长 diff 保留变更最密集的头部内容</li>
+        <li>结构化 prompt：强制 JSON 输出，确保解析稳定</li>
+      </ul>
+    </div>
+    <div class="design-card fu">
+      <h3>🛡️ 误报与漏报控制</h3>
+      <ul>
+        <li>temperature=0.2 降低随机性，提高输出一致性</li>
+        <li>风险分高/中/低三级，开发者可按优先级处理</li>
+        <li>结合 PR 描述理解改动意图，减少误报</li>
+        <li>system prompt 专注代码审查角色，减少无关输出</li>
+      </ul>
+    </div>
+    <div class="design-card fu">
+      <h3>🚀 未来扩展方向</h3>
+      <ul>
+        <li>GitHub Actions 集成，自动评论到 PR</li>
+        <li>支持 GitLab / Gitee 等其他平台</li>
+        <li>代码库 RAG 检索，提升跨文件分析能力</li>
+        <li>团队风格偏好学习，个性化建议</li>
+        <li>测试用例自动生成</li>
+      </ul>
+    </div>`;
+}
+
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+function exportReport() {
+  if (!lastResult) return;
+  const blob = new Blob([JSON.stringify(lastResult, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pr_review_report.json'; a.click();
+}
+</script>
+</body>
+</html>
